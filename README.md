@@ -1,311 +1,99 @@
-## Introduction
-Python implementations of cryptographic attacks and utilities.
+# Cryptographic Attacks
 
-## Requirements
-* [SageMath](https://www.sagemath.org/) with Python 3.9
-* [PyCryptodome](https://pycryptodome.readthedocs.io/)
+Repository containing my Sage and/or Python implementations of attacks on popular ciphers and public key cryptosystems.  
 
-You can check your SageMath Python version using the following command:
-```
-$ sage -python --version
-Python 3.9.0
-```
-If your SageMath Python version is older than 3.9.0, some features in some scripts might not work.
+# Overview
 
-## Usage
-Unit tests are located in the `test` directory and can be executed using the `unittest` module or using `pytest`. This should not take very long, perhaps a few minutes depending on your machine.
+As of yet, there are implementations for attacks against RSA, Diffie-Hellman and its elliptic curve variant, AES-ECB, and AES-CBC.  There are also miscellaneous factoring attacks, which may be applicable for targeting many public key schemes, and some notes on topics such as elliptic curve pairings.  I plan to finish all existing public key attacks in the future and significantly expand attack support for symmetric key primitives, as the latter has been relatively lacking for the past few years.  Additionally, I aim to add more general purpose algorithms in the domains of factoring, state recovery for non-cryptographically secure PRNG (such as ones that use linear congruential generators or linear-feedback shift registers), and more, the reason being that doing so should allow for more flexibility when attacking cryptographic primitives.
 
-To run a specific attack, you must add the code to the proper file before executing it.
+# Currently Implemented Attacks
 
-### Example
-
-For example, you want to attack RSA using the Boneh-Durfee attack, with the following parameters (taken from [test_rsa.py](test/test_rsa.py)):
-```python
-N = 88320836926176610260238895174120738360949322009576866758081671082752401596826820274141832913391890604999466444724537056453777218596634375604879123818123658076245218807184443147162102569631427096787406420042132112746340310992380094474893565028303466135529032341382899333117011402408049370805729286122880037249
-e = 36224751658507610673165956970793195381480143363550601971796688201449789736497322700382657163240771111376677180786660893671085854060092736865293791299460933460067267613023891500397200389824179925263846148644777638774319680682025117466596019474987378275216579013846855328009375540444176771945272078755317168511
-```
-
-You add the following code at the bottom of the [boneh_durfee.py](attacks/rsa/boneh_durfee.py) file:
-```python
-import logging
-
-# Some logging so we can see what's happening.
-logging.basicConfig(level=logging.DEBUG)
-
-N = 88320836926176610260238895174120738360949322009576866758081671082752401596826820274141832913391890604999466444724537056453777218596634375604879123818123658076245218807184443147162102569631427096787406420042132112746340310992380094474893565028303466135529032341382899333117011402408049370805729286122880037249
-e = 36224751658507610673165956970793195381480143363550601971796688201449789736497322700382657163240771111376677180786660893671085854060092736865293791299460933460067267613023891500397200389824179925263846148644777638774319680682025117466596019474987378275216579013846855328009375540444176771945272078755317168511
-p_bits = 512
-delta = 0.26
-
-p, q = attack(N, e, p_bits, delta=delta, m=3)
-assert p * q == N
-print(f"Found {p = } and {q = }")
-```
-
-Then you can simply execute the file using Sage. It does not matter where you execute it from, the Python path is automagically set (you can also call the attacks from other Python files, but then you'll have to fix the Python path yourself):
-```commandline
-[crypto-attacks]$ sage -python attacks/rsa/boneh_durfee.py
-INFO:root:Trying m = 3, t = 1...
-DEBUG:root:Generating shifts...
-DEBUG:root:Creating a lattice with 11 shifts (order = 'invlex', sort_shifts_reverse = False, sort_monomials_reverse = False)...
-DEBUG:root:Reducing a 11 x 11 lattice...
-DEBUG:root:Reconstructing polynomials (divide_original = True, modulus_bound = False, divide_gcd = True)...
-DEBUG:root:Polynomial at row 8 is constant, ignoring...
-DEBUG:root:Reconstructed polynomial has gcd 1312232632720549890113031660369306919929075823824696839212183146130434668203517349691252841557097914064120078389640402109017308806168467714230057403815071456395553717020189622129706447677967264344568789118172311850383406340547579993263937406518074980025897726255316031512238322022839331135299265704052474541497687419350763703993630899191179705015113329644753599872380152055902238937889027950089072598069861391599563222633064848996619752054685734260976071760984100109990150069201501748622288840900421607423175114026653242500476408861976142751384898489130281755466581359057847077651502734556259387442296763474369957121 with polynomial at 8, dividing...
-DEBUG:root:Reconstructed 10 polynomials
-DEBUG:root:Computing pairwise gcds to find trivial roots...
-DEBUG:root:Using Groebner basis method to find roots...
-DEBUG:root:Sequence length: 10, Groebner basis length: 1
-DEBUG:root:Sequence length: 9, Groebner basis length: 1
-DEBUG:root:Sequence length: 8, Groebner basis length: 1
-DEBUG:root:Sequence length: 7, Groebner basis length: 2
-DEBUG:root:Found Groebner basis with length 2, trying to find roots...
-Found p = 7866790440964395011005623971351568677139336343167390105188826934257986271072664643571727955882500173182140478082778193338086048035817634545367411924942763 and q = 11227048386374621771175649743442169526805922745751610531569607663416378302561807690656370394330458335919244239976798600743588701676542461805061598571009923
-```
-
-The parameters `m` and `t` as shown in the output log deserve special attention. These parameters are used in many lattice-based (small roots) algorithms to tune the lattice size. Conceptually, `m` (sometimes called `k`) and `t` represent the number of "shifts" used in the lattice, which is roughly equal or proportional to the number of rows. Therefore, increasing `m` and `t` will increase the size of the lattice, which also increases the time required to perform lattice reduction (currently using LLL). On the other hand, if `m` and `t` are too low, it is possible that the lattice reduction will not result in appropriate vectors, therefore wasting the time spent reducing. Hence, this is a trade-off.
-
-In the current version of the project, `m` must always be provided by the user (the default value is set to `1`). `t` can, in some cases, be computed based on the specific small roots method used by the attack. However it can still be tweaked by the user. In general, there are two ways to use these kinds of parameters:
-* Implement a loop which starts at `m = 1` until an answer is found (example below). This is a simple approach, but risks wasting time on futile computations with too small lattices.
-```
-m = 1
-while True:
-    res = attack(..., m=m)
-    if res is not None:
-        # The attack succeeded!
-        break
-    m += 1
-```
-* Implement a debug version of the attack you're trying to use (with known results), and determine the `m` value which results in good lattice vectors. Then directly call the attack method with the correct `m` value.
-
-
-## Implemented attacks
-### Approximate Common Divisor
-* [x] [Multivariate polynomial attack](attacks/acd/mp.py) [^acd_mp]
-* [x] [Orthogonal based attack](attacks/acd/ol.py) [^acd_ol]
-* [x] [Simultaneous Diophantine approximation attack](attacks/acd/sda.py) [^acd_sda]
-
-### CBC
-* [x] [Bit flipping attack](attacks/cbc/bit_flipping.py)
-* [x] [IV recovery attack](attacks/cbc/iv_recovery.py)
-* [x] [Padding oracle attack](attacks/cbc/padding_oracle.py)
-
-### CBC + CBC-MAC
-* [x] [Key reuse attack (encrypt-and-MAC)](attacks/cbc_and_cbc_mac/eam_key_reuse.py)
-* [x] [Key reuse attack (encrypt-then-MAC)](attacks/cbc_and_cbc_mac/etm_key_reuse.py)
-* [x] [Key reuse attack (MAC-then-encrypt)](attacks/cbc_and_cbc_mac/mte_key_reuse.py)
-
-### CBC-MAC
-* [x] [Length extension attack](attacks/cbc_mac/length_extension.py)
-
-### CTR
-* [x] [Bit flipping attack](attacks/ctr/bit_flipping.py)
-* [x] [CRIME attack](attacks/ctr/crime.py)
-* [x] [Separator oracle attack](attacks/ctr/separator_oracle.py)
-
-### ECB
-* [x] [Plaintext recovery attack](attacks/ecb/plaintext_recovery.py)
-* [x] [Plaintext recovery attack (harder variant)](attacks/ecb/plaintext_recovery_harder.py)
-* [x] [Plaintext recovery attack (hardest variant)](attacks/ecb/plaintext_recovery_hardest.py)
-
-### Elliptic Curve Cryptography
-* [x] [ECDSA nonce reuse attack](attacks/ecc/ecdsa_nonce_reuse.py)
-* [x] [Frey-Ruck attack](attacks/ecc/frey_ruck_attack.py) [^ecc_frey_ruck_attack]
-* [x] [MOV attack](attacks/ecc/mov_attack.py) [^ecc_mov_attack]
-* [x] [Parameter recovery](attacks/ecc/parameter_recovery.py)
-* [x] [Singular curve attack](attacks/ecc/singular_curve.py)
-* [x] [Smart's attack](attacks/ecc/smart_attack.py) [^ecc_smart_attack]
-
-### ElGamal Encryption
-* [x] [Nonce reuse attack](attacks/elgamal_encryption/nonce_reuse.py)
-* [x] [Unsafe generator attack](attacks/elgamal_encryption/unsafe_generator.py)
-
-### ElgGamal Signature
-* [ ] Bleichenbacher's attack
-* [ ] Khadir's attack
-* [x] [Nonce reuse attack](attacks/elgamal_signature/nonce_reuse.py)
-
-### Factorization
-* [x] [Base conversion factorization](attacks/factorization/base_conversion.py)
-* [x] [Branch and prune attack](attacks/factorization/branch_and_prune.py) [^factorization_branch_and_prune]
-* [x] [Complex multiplication (elliptic curve) factorization](attacks/factorization/complex_multiplication.py) [^factorization_complex_multiplication]
-* [x] [Coppersmith factorization](attacks/factorization/coppersmith.py)
-* [x] [Fermat factorization](attacks/factorization/fermat.py)
-* [x] [Ghafar-Ariffin-Asbullah attack](attacks/factorization/gaa.py) [^factorization_gaa]
-* [x] [Implicit factorization](attacks/factorization/implicit.py) [^factorization_implicit]
-* [x] [Known phi factorization](attacks/factorization/known_phi.py) [^factorization_known_phi]
-* [x] [ROCA](attacks/factorization/roca.py) [^factorization_roca]
-* [x] [Shor's algorithm (classical)](attacks/factorization/shor.py) [^factorization_shor]
-* [x] [Twin primes factorization](attacks/factorization/twin_primes.py)
-* [x] [Factorization of unbalanced moduli](attacks/factorization/unbalanced.py) [^factorization_unbalanced]
-
-### GCM
-* [x] [Forbidden attack](attacks/gcm/forbidden_attack.py) [^gcm_forbidden_attack]
-
-### Hidden Number Problem
-With applications to partial (EC)DSA nonce exposure.
-* [x] [Extended hidden number problem](attacks/hnp/extended_hnp.py) [^hnp_extended_hnp]
-* [ ] Fourier analysis attack
-* [x] [Lattice-based attack](attacks/hnp/lattice_attack.py)
-
-### IGE
-* [x] [Padding oracle attack](attacks/ige/padding_oracle.py)
-
-### Knapsack Cryptosystems
-* [x] [Low density attack](attacks/knapsack/low_density.py) [^knapsack_low_density]
-
-### Linear Congruential Generators
-
-* [x] [LCG parameter recovery](attacks/lcg/parameter_recovery.py)
-* [x] [Truncated LCG parameter recovery](attacks/lcg/truncated_parameter_recovery.py) [^lcg_truncated_parameter_recovery]
-* [x] [Truncated LCG state recovery](attacks/lcg/truncated_state_recovery.py) [^lcg_truncated_state_recovery]
-
-### Learning With Errors
-
-* [x] [Arora-Ge attack](attacks/lwe/arora_ge.py) [^lwe_arora_ge]
-* [ ] Blum-Kalai-Wasserman attack
-* [ ] Lattice reduction attack
-
-### Mersenne Twister
-
-* [x] [State recovery](attacks/mersenne_twister/state_recovery.py)
-
-### One-time Pad
-
-* [x] [Key reuse](attacks/otp/key_reuse.py)
-
-### Pseudoprimes
-
-* [x] [Generating Miller-Rabin pseudoprimes](attacks/pseudoprimes/miller_rabin.py) [^pseudoprimes_miller_rabin]
-
-### RC4
-
-* [x] [Fluhrer-Mantin-Shamir attack](attacks/rc4/fms.py)
+## Public Key Cryptographic Schemes
 
 ### RSA
 
-* [x] [Bleichenbacher's attack](attacks/rsa/bleichenbacher.py) [^rsa_bleichenbacher]
-* [x] [Bleichenbacher's signature forgery attack](attacks/rsa/bleichenbacher_signature_forgery.py)
-* [x] [Boneh-Durfee attack](attacks/rsa/boneh_durfee.py) [^rsa_boneh_durfee]
-* [x] [Cherkaoui-Semmouni's attack](attacks/rsa/cherkaoui_semmouni.py) [^rsa_cherkaoui_semmouni]
-* [x] [Common modulus attack](attacks/rsa/common_modulus.py)
-* [x] [CRT fault attack](attacks/rsa/crt_fault_attack.py)
-* [x] [d fault attack](attacks/rsa/d_fault_attack.py)
-* [x] [Desmedt-Odlyzko attack (selective forgery)](attacks/rsa/desmedt_odlyzko.py) [^rsa_desmedt_odlyzko]
-* [x] [Extended Wiener's attack](attacks/rsa/extended_wiener_attack.py) [^rsa_extended_wiener_attack]
-* [x] [Hastad's broadcast attack](attacks/rsa/hastad_attack.py)
-* [x] [Known CRT exponents attack](attacks/rsa/known_crt_exponents.py) [^rsa_known_crt_exponents]
-* [x] [Partial known CRT exponents attack](attacks/rsa/known_crt_exponents.py) [^rsa_partial_known_crt_exponents]
-* [x] [Known private exponent attack](attacks/rsa/known_d.py)
-* [x] [Low public exponent attack](attacks/rsa/low_exponent.py)
-* [x] [LSB oracle (parity oracle) attack](attacks/rsa/lsb_oracle.py)
-* [x] [Manger's attack](attacks/rsa/manger.py) [^rsa_manger]
-* [x] [Nitaj's CRT-RSA attack](attacks/rsa/nitaj_crt_rsa.py) [^rsa_nitaj_crt_rsa]
-* [x] [Non coprime public exponent attack](attacks/rsa/non_coprime_exponent.py) [^rsa_non_coprime_exponent]
-* [x] [Partial key exposure](attacks/rsa/partial_key_exposure.py) [^rsa_partial_key_exposure1] [^rsa_partial_key_exposure2] [^rsa_partial_key_exposure3] 
-* [x] [Related message attack](attacks/rsa/related_message.py)
-* [x] [Stereotyped message attack](attacks/rsa/stereotyped_message.py)
-* [x] [Wiener's attack](attacks/rsa/wiener_attack.py)
-* [x] [Wiener's attack for Common Prime RSA](attacks/rsa/wiener_attack_common_prime.py) [^rsa_wiener_attack_common_prime]
-* [x] [Wiener's attack (Heuristic lattice variant)](attacks/rsa/wiener_attack_lattice.py) [^rsa_wiener_attack_lattice] [^rsa_wiener_attack_lattice_extended] [^small_roots_aono]
+- [x] [Generalized Hastad's broadcast attack](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/hastad.sage)
+- [x] [Common modulus attack](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/common_modulus.py)
+- [x] [Wiener's attack for small d](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/wiener.sage)
+- [x] [Blinding attack on Unpadded RSA signatures](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/blinding.sage)
+- [x] [Fault attack on RSA-CRT](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/fault_attack.sage)
+- [x] [Franklin-Reiter related message attack + Coppersmith short pad attack](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/coppersmith_short_pad.sage)
+- [x] [Coron's simplification of Coppersmith's root finding algorithm for bivariate polynomials in Z[x, y]](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/RSA/coron.sage)
+- [ ] Partial key recovery attack with bits of d known
 
-### Shamir's Secret Sharing
-* [x] [Deterministic coefficients](attacks/shamir_secret_sharing/deterministic_coefficients.py)
-* [x] [Share forgery](attacks/shamir_secret_sharing/share_forgery.py)
+### Diffie-Hellman
 
-## Other interesting implementations
-* [x] [Adleman-Manders-Miller root extraction method](shared/__init__.py) [^adleman_manders_miller]
-* [x] [Fast CRT using divide-and-conquer](shared/crt.py)
-* [x] [Fast modular inverses](shared/__init__.py)
-* [x] [Linear Hensel lifting](shared/hensel.py)
-* [ ] Quadratic Hensel lifting
-* [x] [Babai's Nearest Plane Algorithm](shared/lattice.py)
-* [x] [Matrix discrete logarithm](shared/matrices.py)
-* [x] [Matrix discrete logarithm (equation)](shared/matrices.py)
-* [x] [PartialInteger](shared/partial_integer.py)
-* [x] [Fast polynomial GCD using half GCD](shared/polynomial.py)
+- [x] [Pohlig-Hellman attack for finding discrete logarithms in cyclic multiplicative groups with smooth order](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/Diffie%20Hellman/pohlig_hellman.sage)
+- [x] [Pohlig-Hellman attack for finding discrete logarithms in elliptic curve additive groups with smooth order](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/Diffie%20Hellman/pohlig_hellman_EC.sage)
+- [ ] Small-subgroup confinement attack
 
-### Elliptic Curve Generation
-* [x] [Complex multiplication](shared/ecc.py)
-* [x] [Anomalous curves](shared/ecc.py)
-* [x] [MNT curves](shared/ecc.py)
-* [x] [Prescribed order](shared/ecc.py)
-* [x] [Prescribed trace](shared/ecc.py)
-* [x] [Supersingular curves](shared/ecc.py)
+### Factoring algorithms (applicable for many public key primitives)
+- [x] [Cheng's 4p - 1 = Ds^2 elliptic curve complex multiplication based factoring](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/Factoring/cm_factor.sage)
 
-### Small Roots
-* [x] [Polynomial roots using Groebner bases](shared/small_roots/__init__.py)
-* [x] [Polynomial roots using resultants](shared/small_roots/__init__.py)
-* [x] [Polynomial roots using Sage variety (triangular decomposition)](shared/small_roots/__init__.py)
-* [x] [Aono method (Minkowski sum lattice)](shared/small_roots/aono.py) [^small_roots_aono]
-* [x] [Blomer-May method](shared/small_roots/blomer_may.py) [^small_roots_blomer_may]
-* [x] [Boneh-Durfee method](shared/small_roots/boneh_durfee.py) [^rsa_boneh_durfee]
-* [x] [Coron method](shared/small_roots/coron.py) [^small_roots_coron]
-* [x] [Coron method (direct)](shared/small_roots/coron_direct.py) [^small_roots_coron_direct]
-* [x] [Ernst et al. methods](shared/small_roots/ernst.py) [^rsa_partial_key_exposure2]
-* [x] [Herrmann-May method (unravelled linearization)](shared/small_roots/herrmann_may.py) [^small_roots_herrmann_may]
-* [x] [Herrmann-May method (modular multivariate)](shared/small_roots/herrmann_may_multivariate.py) [^small_roots_herrmann_may_multivariate]
-* [x] [Howgrave-Graham method](shared/small_roots/howgrave_graham.py) [^small_roots_howgrave_graham]
-* [x] [Jochemsz-May method (modular roots)](shared/small_roots/jochemsz_may_modular.py) [^small_roots_jochemsz_may_modular]
-* [x] [Jochemsz-May method (integer roots)](shared/small_roots/jochemsz_may_integer.py) [^small_roots_jochemsz_may_integer]
-* [x] [Nitaj-Fouotsa method](shared/small_roots/nitaj_fouotsa.py) [^small_roots_nitaj_fouotsa]
+### Elliptic Curves
+- [ ] MOV attack for curves of low embedding degree
 
-[^acd_mp]: Galbraith D. S. et al., "Algorithms for the Approximate Common Divisor Problem" (Section 5)
-[^acd_ol]: Galbraith D. S. et al., "Algorithms for the Approximate Common Divisor Problem" (Section 4)
-[^acd_sda]: Galbraith D. S. et al., "Algorithms for the Approximate Common Divisor Problem" (Section 3)
+## Symmetric Key Ciphers 
 
-[^ecc_frey_ruck_attack]: Harasawa R. et al., "Comparing the MOV and FR Reductions in Elliptic Curve Cryptography" (Section 3)
-[^ecc_mov_attack]: Harasawa R. et al., "Comparing the MOV and FR Reductions in Elliptic Curve Cryptography" (Section 2)
-[^ecc_smart_attack]: Smart N. P., "The discrete logarithm problem on elliptic curves of trace one"
+### AES
 
-[^factorization_branch_and_prune]: Heninger N., Shacham H., "Reconstructing RSA Private Keys from Random Key Bits"
-[^factorization_complex_multiplication]: Sedlacek V. et al., "I want to break square-free: The 4p - 1 factorization method and its RSA backdoor viability"
-[^factorization_gaa]: Ghafar AHA. et al., "A New LSB Attack on Special-Structured RSA Primes"
-[^factorization_implicit]: Nitaj A., Ariffin MRK., "Implicit factorization of unbalanced RSA moduli"
-[^factorization_known_phi]: Hinek M. J., Low M. K., Teske E., "On Some Attacks on Multi-prime RSA" (Section 3)
-[^factorization_roca]: Nemec M. et al., "The Return of Coppersmith’s Attack: Practical Factorization of Widely Used RSA Moduli"
-[^factorization_shor]: M. Johnston A., "Shor’s Algorithm and Factoring: Don’t Throw Away the Odd Orders"
-[^factorization_unbalanced]: Brier E. et al., "Factoring Unbalanced Moduli with Known Bits" (Section 4)
+- [x] [Byte-at-a-time ECB decryption](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Symmetric%20Key/AES/byte_at_a_time/break_ecb.py)
+- [x] [AES-CBC Padding Oracle](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Symmetric%20Key/AES/padding_oracle/padding_oracle.py)
 
-[^gcm_forbidden_attack]: Joux A., "Authentication Failures in NIST version of GCM"
+# Installing SageMath
 
-[^hnp_extended_hnp]: Hlavac M., Rosa T., "Extended Hidden Number Problem and Its Cryptanalytic Applications" (Section 4) 
+SageMath is available on both Windows and Un*x.
 
-[^knapsack_low_density]: Coster M. J. et al., "Improved low-density subset sum algorithms"
+To install SageMath on Windows, download an installer from the following link: https://github.com/sagemath/sage-windows/releases
 
-[^lcg_truncated_parameter_recovery]: Contini S., Shparlinski I. E., "On Stern's Attack Against Secret Truncated Linear Congruential Generators"
-[^lcg_truncated_state_recovery]: Frieze, A. et al., "Reconstructing Truncated Integer Variables Satisfying Linear Congruences"
+To install on Ubuntu and other Linux distros, I believe `sudo apt install sagemath`, or something along those lines will get the job done.
 
-[^lwe_arora_ge]: ["The Learning with Errors Problem: Algorithms"](https://people.csail.mit.edu/vinodv/6876-Fall2018/lecture2.pdf) (Section 1)
+SageMath also has a presence in the cloud:
 
-[^pseudoprimes_miller_rabin]: R. Albrecht M. et al., "Prime and Prejudice: Primality Testing Under Adversarial Conditions"
+* [SageMathCell](http://sagecell.sagemath.org/): (useful as a quick go-to for evaluating Sage code without the need to save, also be mindful of no external connections)
 
-[^rsa_bleichenbacher]: Bleichenbacher D., "Chosen Ciphertext Attacks Against Protocols Based on the RSA Encryption Standard PKCS #1"
-[^rsa_boneh_durfee]: Boneh D., Durfee G., "Cryptanalysis of RSA with Private Key d Less than N^0.292"
-[^rsa_cherkaoui_semmouni]: Cherkaoui-Semmouni M. et al., "Cryptanalysis of RSA Variants with Primes Sharing Most Significant Bits"
-[^rsa_desmedt_odlyzko]: Coron J. et al., "Practical Cryptanalysis of ISO 9796-2 and EMV Signatures (Section 3)"
-[^rsa_extended_wiener_attack]: Dujella A., "Continued fractions and RSA with small secret exponent"
-[^rsa_known_crt_exponents]: Campagna M., Sethi A., "Key Recovery Method for CRT Implementation of RSA"
-[^rsa_partial_known_crt_exponents]: May A., Nowakowski J., Sarkar S., "Approximate Divisor Multiples - Factoring with Only a Third of the Secret CRT-Exponents"
-[^rsa_manger]: Manger J., "A Chosen Ciphertext Attack on RSA Optimal Asymmetric Encryption Padding (OAEP) as Standardized in PKCS #1 v2.0"
-[^rsa_nitaj_crt_rsa]: Nitaj A., "A new attack on RSA and CRT-RSA"
-[^rsa_non_coprime_exponent]: Shumow D., "Incorrectly Generated RSA Keys: How To Recover Lost Plaintexts"
-[^rsa_partial_key_exposure1]: Boneh D., Durfee G., Frankel Y., "An Attack on RSA Given a Small Fraction of the Private Key Bits"
-[^rsa_partial_key_exposure2]: Ernst M. et al., "Partial Key Exposure Attacks on RSA Up to Full Size Exponents"
-[^rsa_partial_key_exposure3]: Blomer J., May A., "New Partial Key Exposure Attacks on RSA"
-[^rsa_wiener_attack_common_prime]: Jochemsz E., May A., "A Strategy for Finding Roots of Multivariate Polynomials with New Applications in Attacking RSA Variants" (Section 5)
-[^rsa_wiener_attack_lattice]: Nguyen P. Q., "Public-Key Cryptanalysis"
-[^rsa_wiener_attack_lattice_extended]: Howgrave-Graham N., Seifert J., "Extending Wiener’s Attack in the Presence of Many Decrypting Exponents"
+* [CoCalc](https://cocalc.com/): (optimal for hosting personal projects in the cloud)
 
-[^adleman_manders_miller]: Cao Z. et al., "Adleman-Manders-Miller Root Extraction Method Revisited" (Section 5)
+It is also possible to host a personal SageMath server, though I have never tried this.
 
-[^small_roots_aono]: Aono Y., "Minkowski sum based lattice construction for multivariate simultaneous Coppersmith's technique and applications to RSA" (Section 4)
-[^small_roots_blomer_may]: Blomer J., May A., "New Partial Key Exposure Attacks on RSA" (Section 6)
-[^small_roots_coron]: Coron J., "Finding Small Roots of Bivariate Integer Polynomial Equations Revisited"
-[^small_roots_coron_direct]: Coron J., "Finding Small Roots of Bivariate Integer Polynomial Equations: a Direct Approach"
-[^small_roots_herrmann_may]: Herrmann M., May A., "Maximizing Small Root Bounds by Linearization and Applications to Small Secret Exponent RSA"
-[^small_roots_herrmann_may_multivariate]: Herrmann M., May A., "Solving Linear Equations Modulo Divisors: On Factoring Given Any Bits" (Section 3 and 4)
-[^small_roots_howgrave_graham]: May A., "New RSA Vulnerabilities Using Lattice Reduction Methods" (Section 3.2)
-[^small_roots_jochemsz_may_modular]: Jochemsz E., May A., "A Strategy for Finding Roots of Multivariate Polynomials with New Applications in Attacking RSA Variants" (Section 2.1)
-[^small_roots_jochemsz_may_integer]: Jochemsz E., May A., "A Strategy for Finding Roots of Multivariate Polynomials with New Applications in Attacking RSA Variants" (Section 2.2)
-[^small_roots_nitaj_fouotsa]: Nitaj A., Fouotsa E., "A New Attack on RSA and Demytko's Elliptic Curve Cryptosystem"
+# Current Notes
+
+The [Notes](https://github.com/pwang00/Cryptographic-Attacks/tree/master/Public%20Key/Notes/) directory contains my notes on miscellaneous cryptography-related topics.  As of now, I have written up a [summary](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/Notes/Elliptic%20Curves/Pairings/Pairings_For_Beginners_Notes.pdf) of the first few chapters of Craig Costello's [Pairings for Beginners](https://static1.squarespace.com/static/5fdbb09f31d71c1227082339/t/5ff394720493bd28278889c6/1609798774687/PairingsForBeginners.pdf) and a SageMath [script](https://github.com/pwang00/Cryptographic-Attacks/blob/master/Public%20Key/Notes/Elliptic%20Curves/Pairings/affine_to_projective.sage) demonstrating elliptic curve point addition and doubling in projective coordinates.
+
+# Future Works
+
+### Existing Attacks
+1. Implement the small-subgroup confinement attack for Diffie-Hellman and its Elliptic Curve counterpart.
+2. Implement the MOV attack for elliptic curves of low embedding degree.
+
+### Future Attacks
+1. Boneh-Durfee attack for d < N^0.292
+2. BLS rogue public key attack
+3. Fault attack on standard (non-CRT) RSA
+4. Small-subgroup confinement attack on Diffie-Hellman
+5. Linear / differential cryptanalysis against DES/AES
+6. Invalid point attacks on Elliptic Curve Diffie-Hellman
+7. State recovery on linear congruential generators (LCGs), truncated and non-truncated
+8. State recovery on linear feedback shift registers (LFSRs)
+
+### Miscellaneous
+1. Add docstrings to each attack to better describe their functionalities.
+2. Add more general purpose scripts that may prove useful for breaking some cryptographic schemes
+3. Improve overall code quality, efficiency, and consistency
+
+Feel free to let me know if there are any bugs.
+
+# Frequently Asked Questions
+
+Q: Why use SageMath instead of pure Python?
+
+A: Sage provides many convenient number-theoretic functions and constructors for algebraic structures commonly used by or used against cryptographic primitives, such as groups, polynomial rings, fields, and elliptic curves.  This saves a lot of time since it allows focus to be placed solely on implementing attacks and useful general purpose algorithms rather than the structures that they depend upon.
+
+# Relevant Links
+
+* [General overview of Coppersmith's attack](https://en.wikipedia.org/wiki/Coppersmith%27s_attack)
+* [Coron's simplification of Coppersmith's algorithm](https://www.iacr.org/archive/crypto2007/46220372/46220372.pdf)
+* [Cheng's 4p - 1 elliptic curve complex multiplication based factoring](https://crocs.fi.muni.cz/_media/public/papers/2019-secrypt-sedlacek.pdf)
+* [Craig Costello's Pairings for Beginners](https://static1.squarespace.com/static/5fdbb09f31d71c1227082339/t/5ff394720493bd28278889c6/1609798774687/PairingsForBeginners.pdf)
+* [20 years of attacks on RSA](https://crypto.stanford.edu/~dabo/pubs/papers/RSA-survey.pdf)
+
